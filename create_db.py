@@ -95,6 +95,9 @@ def process_playlist(playlist_filepath, log_errors=False):
             failed_ID.append(i)
             continue
         video_title=videoinfo[0]['title']
+        channel_id=videoinfo[0]['channelId']
+        if channel_id==None:
+            channel_id="UC2hkwpSfrl6iniQNbwFXMog"
         video_duration=get_duration(videoinfo[0]["duration"])
         try:
             videoinfo_ID=videoinfo[0]['url_suffix'].split("?v=")[1].split("&pp=")[0]
@@ -112,7 +115,7 @@ def process_playlist(playlist_filepath, log_errors=False):
             videoId=i,
             title=video_title,
             author=videoinfo[0]['channel'],
-            authorId="UC2hkwpSfrl6iniQNbwFXMog",
+            authorId=channel_id,
             published="",
             lengthSeconds=video_duration,
             timeAdded=current_time_ms,
@@ -152,11 +155,10 @@ def main():
             if os.path.isfile(i):
                 if i.split(".")[-1] in ("txt", "csv"):
                     playlist_files.append(i)
-    #if only a single entry
+
     if len(playlist_files)==1:
         process_playlist(playlist_files[0],log_errors)
         exit(0)
-    # for multiple entries
     for i,playlist in enumerate(playlist_files,start=1):
         filename=str(Path(playlist).name)
         print(f"[{i}/{len(playlist_files)}] {filename}")
