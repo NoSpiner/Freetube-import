@@ -22,7 +22,6 @@ class YoutubeSearch:
         return results
 
     def _parse_html(self, response):
-        print("hello, this is youtube search")
         results = []
         start = (
             response.index("ytInitialData")
@@ -32,15 +31,12 @@ class YoutubeSearch:
         end = response.index("};", start) + 1
         json_str = response[start:end]
         data = json.loads(json_str)
-        with open("YT_response.json", "w") as my_file:
-            my_file.write(json_str)
 
         for contents in data["contents"]["twoColumnSearchResultsRenderer"]["primaryContents"]["sectionListRenderer"]["contents"]:
             for video in contents["itemSectionRenderer"]["contents"]:
                 res = {}
                 if "videoRenderer" in video.keys():
                     video_data = video.get("videoRenderer", {})
-                    print(video_data.get("avatar",{}).get("decoratedAvatarViewModel",{}).get("rendererContext",{}).get("commandContext",{}).get("onTap",{}).get("innertubeCommand",{}).get("browseEndpoint",{}).get("browseId",None))
                     res["id"] = video_data.get("videoId", None)
                     res["thumbnails"] = [thumb.get("url", None) for thumb in video_data.get("thumbnail", {}).get("thumbnails", [{}]) ]
                     res["title"] = video_data.get("title", {}).get("runs", [[{}]])[0].get("text", None)
