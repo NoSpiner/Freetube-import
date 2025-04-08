@@ -16,15 +16,15 @@ Help message:
         -l, --log-errors  Also lists the videos that failed the metadata fetch
         -a, --list-all    Takes all .txt and csv files as input from the current working directory.
 
-Works without YouTube api through YouTube-search library. Also works atleast on piped links, probably also on lists of Invidious links and other links that follow the standard youtube url format.
+Works without YouTube api through a custom version of [YouTube-search library](https://github.com/joetats/youtube_search/). Also works atleast on piped links, probably also on lists of Invidious links and other links that follow the standard youtube url format.
 
-While the script should work perfectly for 95% of the videos, some channel names in the playlist view can however get messed up. This is due to incorrect metadata fetch. Clicking the link to the video's channel in playlist view also does not work, but does work after opening the video. 
+While the script should work perfectly for 95% of the videos, some channel names in the playlist view can however get messed up. This is due to incorrect metadata fetch. 
 These are the costs for avoiding the hassle with google's own api.
 
 ###  Dependencies 
 
-       pip install youtube-search
-https://pypi.org/project/youtube-search/
+       pip install requests
+https://pypi.org/project/requests/
 
       pip install tqdm
 https://pypi.org/project/tqdm/
