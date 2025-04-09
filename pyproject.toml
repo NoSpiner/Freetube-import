@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "freetube-import"
+version = "0.26.0"
+authors = [{ name="NoSpiner"}]
+description = "Converts text and youtube .csv files into FreeTube playlists"
+keywords = ["freetube","youtube","tube","playlist","import","cli","console","video","videos"]
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [
+  "tqdm",
+  "requests",
+]
+
+[project.urls]
+Homepage = "https://github.com/NoSpiner/Freetube-import"
+Issues = "https://github.com/NoSpiner/Freetube-import/issues"
+
+[project.scripts]
+freetube-import = "freetube_import:main"

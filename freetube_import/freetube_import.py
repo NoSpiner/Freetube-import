@@ -1,7 +1,7 @@
 import uuid
 import time
 from pathlib import Path
-from youtube_search import YoutubeSearch
+from .youtube_search import YoutubeSearch
 import json
 import argparse
 from tqdm import tqdm
