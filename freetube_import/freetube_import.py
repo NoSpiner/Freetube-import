@@ -6,6 +6,7 @@ import json
 import argparse
 from tqdm import tqdm
 import re
+import sys
 import requests
 import os
 
@@ -52,15 +53,17 @@ def process_csv(path):
         Video_IDs=[]
         data_start=False
         for i in Videos:
-            if i.split(",")[0]=="Video ID":
+            if not data_start:
                 data_start=True
                 continue
             if data_start:
-                Video_IDs.append(i.split(",")[0])
+                if not len(i.split(",")[0].strip())==11:
+                    continue
+                Video_IDs.append(i.split(",")[0].strip())
     return Video_IDs
 
 #Does the actual parsing and writing
-def process_playlist(playlist_filepath, log_errors=False):
+def process_playlist(playlist_filepath, log_errors=False,list_broken_videos=False):
     playlistname=str(Path(playlist_filepath).name)
     playlistformat=playlistname.split(".")[1]
     playlistname=playlistname.split(".")[0]
@@ -135,19 +138,23 @@ def process_playlist(playlist_filepath, log_errors=False):
         print("[Failed playlist items]")
         for i in failed_ID:
             print('https://www.youtube.com/watch?v='+i)
-    #if len(failed_yt_search) !=0 and log_errors:
-    #    print("[Videos with possibly broken metadata]")
-    #    for i in failed_yt_search:
-    #        print('https://www.youtube.com/watch?v='+i)
+    if len(failed_yt_search) !=0 and list_broken_videos:
+        print("[Videos with possibly broken metadata]")
+        for i in failed_yt_search:
+            print('https://www.youtube.com/watch?v='+i)
 
 def main():
     parser = argparse.ArgumentParser(description="Import youtube playlists")
     parser.add_argument("filepath", type=str, help="path to a valid .txt or .csv playlist file or files", nargs="*")
-    parser.add_argument('-l', '--log-errors',action='store_true', help="Also lists the videos that failed the metadata fetch")
     parser.add_argument('-a', '--list-all',action='store_true', help="Takes all .txt and csv files as input from the current working directory.")
-    flags = parser.parse_args()
+    parser.add_argument('-b', '--list-broken-videos',action='store_true', help="Lists videos that were added but have possibly broken metadata (for debugging).")
+    parser.add_argument('-e', '--log-errors',action='store_true', help="Also lists the videos that failed the metadata fetch")
+
+    flags = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
+
     playlist_files=flags.filepath
     log_errors=flags.log_errors
+    list_broken_videos=flags.list_broken_videos
     #list txt and csv files in current working directory
     if flags.list_all:
         playlist_files=[]
@@ -157,13 +164,13 @@ def main():
                     playlist_files.append(i)
 
     if len(playlist_files)==1:
-        process_playlist(playlist_files[0],log_errors)
+        process_playlist(playlist_files[0],log_errors,list_broken_videos)
         exit(0)
     for i,playlist in enumerate(playlist_files,start=1):
         filename=str(Path(playlist).name)
         print(f"[{i}/{len(playlist_files)}] {filename}")
         try:
-            process_playlist(playlist,log_errors)
+            process_playlist(playlist,log_errors,list_broken_videos)
         except Exception as e:
             print(f"{filename} Failed: {e}")
         print(" ")
