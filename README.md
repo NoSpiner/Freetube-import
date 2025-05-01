@@ -24,9 +24,11 @@ Help message:
       positional arguments:
         filepath          path to a valid .txt or .csv playlist file or files
       options:
-        -h, --help        show this help message and exit
-        -l, --log-errors  Also lists the videos that failed the metadata fetch
-        -a, --list-all    Takes all .txt and csv files as input from the current working directory.
+        -h, --help            show this help message and exit
+        -a, --list-all        Takes all .txt and csv files as input from the current working directory.
+        -b, --list-broken-videos
+                        Lists videos that were added but have possibly broken metadata (for debugging).
+        -e, --log-errors      Also lists the videos that failed the metadata fetch
 
 Works without YouTube api through a custom version of [YouTube-search library](https://github.com/joetats/youtube_search/). Also works atleast on piped links, probably also on lists of Invidious links and other links that follow the standard youtube url format.
 
