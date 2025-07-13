@@ -153,13 +153,15 @@ def parse_videos(playlist_filepath, stdin):
             logger.critical(f"{playlistformat} is invalid file format.")
             return
     print(f"Reading file {playlist_filepath}, the playlistfile has {len(Video_IDs)} entries", file=sys.stderr)
-    print(f"writing to file {playlistname}.db", file=sys.stderr)
     return Video_IDs, playlistname
 
 
 # Does the actual parsing and writing
-def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False):
+def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=False):
     Video_IDs, playlistname = parse_videos(playlist_filepath, stdin)
+    if pl_name:
+        playlistname = pl_name
+    print(f"writing to file {playlistname}.db", file=sys.stderr)
     playlist_UUID = uuid.uuid4()
     current_time_ms = int(time.time() * 1000)
     playlist_dict = dict(
@@ -250,6 +252,7 @@ def main():
     parser.add_argument('-b', '--list-broken-videos',action='store_true', help="Lists videos that were added but have possibly broken metadata (for debugging).")
     parser.add_argument('-e', '--log-errors',action='store_true', help="Also lists the videos that failed the metadata fetch")
     parser.add_argument('-s', '--stdin',action='store_true', help="Takes stdin as input and outputs dirextly to stdout")
+    parser.add_argument('-n', '--name', required=False, help="sets a name for playlist, otherwise uses input filename")
 
     flags = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
@@ -257,6 +260,8 @@ def main():
     log_errors = flags.log_errors
     list_broken_videos = flags.list_broken_videos
     stdin = flags.stdin
+    pl_name = flags.name
+
     # list txt and csv files in current working directory
     if flags.list_all:
         playlist_files = []
@@ -266,7 +271,7 @@ def main():
                     playlist_files.append(i)
 
     if len(playlist_files) == 1:
-        process_playlist(playlist_files[0], log_errors, list_broken_videos)
+        process_playlist(playlist_files[0], log_errors, list_broken_videos, pl_name=pl_name)
         exit(0)
     for i, playlist in enumerate(playlist_files, start=1):
         filename = str(Path(playlist).name)
@@ -277,7 +282,7 @@ def main():
             logger.critical(f"{filename} Failed: {e}")
         print(" ", file=sys.stderr)
     if stdin:
-        process_playlist("", stdin=True)
+        process_playlist("", stdin=True, pl_name=pl_name)
 
 
 logger = logging.getLogger(__name__)
