@@ -35,6 +35,7 @@ Help message:
                         Lists videos that were added but have possibly broken metadata (for debugging).
         -e, --log-errors      Also lists the videos that failed the metadata fetch
         -s, --stdin           Takes stdin as input and outputs dirextly to stdout
+        -n NAME, --name NAME  sets a name for playlist, otherwise uses input filename
 
 While buggy and experimental `stdin` mode can used in scripts and automation. Not for average users.
 
