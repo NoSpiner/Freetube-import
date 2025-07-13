@@ -15,7 +15,7 @@ Install via pip:
 
 https://pypi.org/project/freetube-import/
 
-usage:
+Basic usage:
 
       freetube-import <file>... <file2> <file3>
 
@@ -40,6 +40,15 @@ Help message:
 While buggy and experimental `stdin` mode can used in scripts and automation. Not for average users.
 
        cat test.txt | freetube-import -s > std_test.db
+
+It might be usefull to set a name that shows up in FreeTube. Otherwise in stdin mode a placeholder name is generated.
+
+       cat test.txt | freetube-import -s -n playlist-name > std_test.db
+
+pro tip: Try appending the ouput to FreeTube's own playlist.db file. So playlists get automatically added. (backup your files before hand, close freetube before, at your own risk)
+
+      cat test.txt | freetube-import -s -n playlist-name >> your/path/FreeTube/playlists.db
+
 
 Works without YouTube api through a custom version of [YouTube-search library](https://github.com/joetats/youtube_search/). Also works atleast on piped links, probably also on lists of Invidious links and other links that follow the standard youtube url format.
 
