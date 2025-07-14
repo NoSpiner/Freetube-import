@@ -117,25 +117,51 @@ def process_csv(path):
     return Video_IDs
 
 
-# Does the actual parsing and writing
-def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False):
-    if not Path(playlist_filepath).is_file():
-        logger.critical(f"{playlist_filepath} is not a file.")
-        return
-    playlistname = str(Path(playlist_filepath).name)
-    # a playlist name could have a dot in it so use splitext instead of splitting on a '.'
-    playlistformat = os.path.splitext(playlistname)[1][1:].strip().lower()
-    playlistname = os.path.splitext(playlistname)[0]
+def process_stdin():
+    Videos = sys.stdin.readlines()
     Video_IDs = []
-    if playlistformat == "txt":
-        Video_IDs = process_txt(playlist_filepath)
-    elif playlistformat == "csv":
-        Video_IDs = process_csv(playlist_filepath)
+    for i in Videos:
+        id = re.split(r"\?v=|youtu\.be/|shorts/", i)
+        try:
+            id = id[1].rstrip()
+            Video_IDs.append(id)
+        except IndexError:
+            pass
+    logger.debug(f"Std input read with {len(Video_IDs)} items")
+    return Video_IDs
+
+
+def parse_videos(playlist_filepath, stdin):
+    if stdin:
+        Video_IDs = process_stdin()
+        playlistname = f"playlist-{int(time.time())}"
+
     else:
-        logger.critical(f"{playlistformat} is invalid file format.")
-        return
-    print(f"Reading file {playlist_filepath}, the playlistfile has {len(Video_IDs)} entries")
-    print(f"writing to file {playlistname}.db")
+        if not Path(playlist_filepath).is_file():
+            logger.critical(f"{playlist_filepath} is not a file.")
+            return
+        playlistname = str(Path(playlist_filepath).name)
+        # a playlist name could have a dot in it so use splitext instead of splitting on a '.'
+        playlistformat = os.path.splitext(playlistname)[1][1:].strip().lower()
+        playlistname = os.path.splitext(playlistname)[0]
+        Video_IDs = []
+        if playlistformat == "txt":
+            Video_IDs = process_txt(playlist_filepath)
+        elif playlistformat == "csv":
+            Video_IDs = process_csv(playlist_filepath)
+        else:
+            logger.critical(f"{playlistformat} is invalid file format.")
+            return
+    print(f"Reading file {playlist_filepath}, the playlistfile has {len(Video_IDs)} entries", file=sys.stderr)
+    return Video_IDs, playlistname
+
+
+# Does the actual parsing and writing
+def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=False):
+    Video_IDs, playlistname = parse_videos(playlist_filepath, stdin)
+    if pl_name:
+        playlistname = pl_name
+    print(f"writing to file {playlistname}.db", file=sys.stderr)
     playlist_UUID = uuid.uuid4()
     current_time_ms = int(time.time() * 1000)
     playlist_dict = dict(
@@ -195,22 +221,25 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
         playlist_dict["videos"].append(video_dict)
         write_counter += 1
         logger.info(f"https://www.youtube.com/watch?v={i} written successfully")
-    if len(playlist_dict["videos"]) != 0:
+    if len(playlist_dict["videos"]) != 0 and not stdin:
         outputfile = open(playlistname+".db", "w")
         outputfile.write(json.dumps(playlist_dict, separators = (',', ':'))+"\n")
         outputfile.close()
         logger.info(f"{playlistname}.db written({write_counter}/{len(Video_IDs)})")
-        print(f"Task failed successfully! {playlistname}.db written, with {write_counter} entries")
+        print(f"Task failed successfully! {playlistname}.db written, with {write_counter} entries", file=sys.stderr)
+    elif stdin:
+        print(json.dumps(playlist_dict, separators = (',', ':')))
+        logger.info(f"written({write_counter}/{len(Video_IDs)}) into standard output")
     else:
-        print("No entries to write")
+        print("No entries to write", file=sys.stderr)
     if len(failed_ID) != 0 and log_errors:
-        print("[Failed playlist items]")
+        print("[Failed playlist items]", file=sys.stderr)
         for i in failed_ID:
-            print('https://www.youtube.com/watch?v='+i)
+            print('https://www.youtube.com/watch?v='+i, file=sys.stderr)
     if len(failed_yt_search) != 0 and list_broken_videos:
         print("[Videos with possibly broken metadata]")
         for i in failed_yt_search:
-            print('https://www.youtube.com/watch?v='+i)
+            print('https://www.youtube.com/watch?v='+i, file=sys.stderr)
 
 
 def main():
@@ -222,12 +251,17 @@ def main():
     parser.add_argument('-a', '--list-all',action='store_true', help="Takes all .txt and csv files as input from the current working directory.")
     parser.add_argument('-b', '--list-broken-videos',action='store_true', help="Lists videos that were added but have possibly broken metadata (for debugging).")
     parser.add_argument('-e', '--log-errors',action='store_true', help="Also lists the videos that failed the metadata fetch")
+    parser.add_argument('-s', '--stdin',action='store_true', help="Takes stdin as input and outputs dirextly to stdout")
+    parser.add_argument('-n', '--name', required=False, help="sets a name for playlist, otherwise uses input filename")
 
     flags = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
     playlist_files = flags.filepath
     log_errors = flags.log_errors
     list_broken_videos = flags.list_broken_videos
+    stdin = flags.stdin
+    pl_name = flags.name
+
     # list txt and csv files in current working directory
     if flags.list_all:
         playlist_files = []
@@ -237,16 +271,18 @@ def main():
                     playlist_files.append(i)
 
     if len(playlist_files) == 1:
-        process_playlist(playlist_files[0], log_errors, list_broken_videos)
+        process_playlist(playlist_files[0], log_errors, list_broken_videos, pl_name=pl_name)
         exit(0)
     for i, playlist in enumerate(playlist_files, start=1):
         filename = str(Path(playlist).name)
-        print(f"[{i}/{len(playlist_files)}] {filename}")
+        print(f"[{i}/{len(playlist_files)}] {filename}", file=sys.stderr)
         try:
             process_playlist(playlist, log_errors, list_broken_videos)
         except Exception as e:
             logger.critical(f"{filename} Failed: {e}")
-        print(" ")
+        print(" ", file=sys.stderr)
+    if stdin:
+        process_playlist("", stdin=True, pl_name=pl_name)
 
 
 logger = logging.getLogger(__name__)
