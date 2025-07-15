@@ -132,14 +132,14 @@ def process_stdin():
 
 
 def parse_videos(playlist_filepath, stdin):
-    if stdin:
+    if stdin and not playlist_filepath:
         Video_IDs = process_stdin()
         playlistname = f"playlist-{int(time.time())}"
 
     else:
         if not Path(playlist_filepath).is_file():
             logger.critical(f"{playlist_filepath} is not a file.")
-            return
+            exit(1)
         playlistname = str(Path(playlist_filepath).name)
         # a playlist name could have a dot in it so use splitext instead of splitting on a '.'
         playlistformat = os.path.splitext(playlistname)[1][1:].strip().lower()
@@ -151,7 +151,7 @@ def parse_videos(playlist_filepath, stdin):
             Video_IDs = process_csv(playlist_filepath)
         else:
             logger.critical(f"{playlistformat} is invalid file format.")
-            return
+            exit(1)
     print(f"Reading file {playlist_filepath}, the playlistfile has {len(Video_IDs)} entries", file=sys.stderr)
     return Video_IDs, playlistname
 
@@ -271,18 +271,20 @@ def main():
                     playlist_files.append(i)
 
     if len(playlist_files) == 1:
-        process_playlist(playlist_files[0], log_errors, list_broken_videos, pl_name=pl_name)
+        process_playlist(playlist_files[0], log_errors, list_broken_videos,stdin, pl_name)
         exit(0)
-    for i, playlist in enumerate(playlist_files, start=1):
-        filename = str(Path(playlist).name)
-        print(f"[{i}/{len(playlist_files)}] {filename}", file=sys.stderr)
-        try:
-            process_playlist(playlist, log_errors, list_broken_videos)
-        except Exception as e:
-            logger.critical(f"{filename} Failed: {e}")
-        print(" ", file=sys.stderr)
-    if stdin:
-        process_playlist("", stdin=True, pl_name=pl_name)
+    elif len(playlist_files) > 1:
+        for i, playlist in enumerate(playlist_files, start=1):
+            filename = str(Path(playlist).name)
+            print(f"[{i}/{len(playlist_files)}] {filename}", file=sys.stderr)
+            try:
+                process_playlist(playlist, log_errors, list_broken_videos, stdin)
+            except Exception as e:
+                logger.critical(f"{filename} Failed: {e}")
+            print(" ", file=sys.stderr)
+        exit(0)
+    elif stdin:
+        process_playlist("", stdin=stdin, pl_name=pl_name)
 
 
 logger = logging.getLogger(__name__)
