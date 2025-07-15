@@ -45,7 +45,7 @@ It might be usefull to set a name that shows up in FreeTube. Otherwise in stdin 
 
        cat test.txt | freetube-import -s -n playlist-name > std_test.db
 
-pro tip: Try appending the ouput to FreeTube's own playlist.db file. So playlists get automatically added. (backup your files beforehand, close freetube, at your own risk)
+pro tip: Try appending the ouput to FreeTube's own playlist.db file. So playlists get automatically added. (at your own risk, backup your files beforehand, close freetube to avoid file corruption)
 
       cat test.txt | freetube-import -s -n playlist-name >> your/path/FreeTube/playlists.db
 
