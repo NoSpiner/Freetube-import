@@ -216,6 +216,7 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
     write_counter = 0
     failed_yt_search = []
     failed_ID = []
+    latest_added_timestamp_ms = 0
     for video in tqdm(Videos, disable=logging.getLogger(__name__).isEnabledFor(logging.DEBUG)):
         video_UUID = uuid.uuid4()
         current_time_ms = int(time.time()*1000)
@@ -262,11 +263,14 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
 
         if video.date_added_ms:
             video_dict["timeAdded"] = video.date_added_ms
+            latest_added_timestamp_ms = max(latest_added_timestamp_ms, video.date_added_ms)
 
         playlist_dict["videos"].append(video_dict)
         write_counter += 1
         logger.info(f"https://www.youtube.com/watch?v={video.id} written successfully")
     
+    playlist_dict["lastUpdatedAt"] = latest_added_timestamp_ms
+
     if len(playlist_dict["videos"]) != 0 and not stdin:
         outputfile = open(playlistname+".db", "w")
         outputfile.write(json.dumps(playlist_dict, separators = (',', ':'))+"\n")
