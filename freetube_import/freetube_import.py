@@ -12,6 +12,7 @@ import logging
 import html
 import urllib.parse
 from datetime import datetime
+from typing import Union
 try:
     from youtube_search import YoutubeSearch
 except ImportError:
@@ -20,9 +21,38 @@ except ImportError:
 
 class VideoInfo:
 
-    def __init__(self, video_id: str, date_added_ms: int | None):
+    def __init__(
+            self,
+            video_id: str,
+            title: str = "",
+            author_name: str = "",
+            author_id: str = "",
+            length_s: int = 0,
+            date_added_ms: int = int(time.time() * 1000)
+        ):
+
         self.id = video_id
+        self.title = title
+        self.author_name = author_name
+        self.author_id = author_id
+        self.length_s = length_s
         self.date_added_ms = date_added_ms
+
+    def to_dict(self) -> dict[str, Union[str, int, None]]:
+        return {
+            "videoId": self.id,
+            "title": self.title,
+            "author": self.author_name,
+            "authorId": self.author_id,
+            "published": "",
+            "lengthSeconds": self.length_s,
+            "timeAdded": self.date_added_ms,
+            "type": "video",
+            "playlistItemId": str(uuid.uuid4())
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict())
 
 
 def YT_authordata(yt_id):
@@ -98,10 +128,10 @@ def yt_date_to_timestamp_ms(date: str) -> int:
     return int(dt.timestamp() * 1000)
 
 
-def process_txt(path):
+def process_txt(path) -> list[VideoInfo]:
     with open(path, "r") as inputfile:
         lines = inputfile.readlines()
-        Videos = []
+        Videos: list[VideoInfo] = []
         for l in lines:
             if l.strip() == "":
                 continue
@@ -109,23 +139,17 @@ def process_txt(path):
             video_id = re.split(r"\?v=|youtu\.be/|shorts/", l)
             try:
                 video_id = video_id[1].rstrip()
-                current_time_ms = int(time.time()*1000)
-                Videos.append(
-                    VideoInfo(
-                        video_id=video_id,
-                        date_added_ms=current_time_ms
-                    )
-                )
+                Videos.append(VideoInfo(video_id=video_id))
             except IndexError:
                 pass
     logger.debug(f"{path} .txt file processed")
     return Videos
 
 
-def process_csv(path):
+def process_csv(path) -> list[VideoInfo]:
     with open(path, "r") as inputfile:
         lines = inputfile.readlines()
-        Videos = []
+        Videos: list[VideoInfo] = []
         data_start = False
         for l in lines:
             if l.strip() == "":
@@ -150,9 +174,9 @@ def process_csv(path):
     return Videos
 
 
-def process_stdin():
+def process_stdin() -> list[VideoInfo]:
     lines = sys.stdin.readlines()
-    Videos = []
+    Videos: list[VideoInfo] = []
     for l in lines:
         if l.strip() == "":
             continue
@@ -160,20 +184,14 @@ def process_stdin():
         video_id = re.split(r"\?v=|youtu\.be/|shorts/", l)
         try:
             video_id = video_id[1].rstrip()
-            current_time_ms = int(time.time()*1000)
-            Videos.append(
-                VideoInfo(
-                    video_id=video_id,
-                    date_added_ms=current_time_ms
-                )
-            )
+            Videos.append(VideoInfo(video_id=video_id))
         except IndexError:
             pass
     logger.debug(f"Std input read with {len(Videos)} items")
     return Videos
 
 
-def parse_videos(playlist_filepath, stdin):
+def parse_videos(playlist_filepath, stdin) -> tuple[list[VideoInfo], str]:
     if stdin and not playlist_filepath:
         Videos = process_stdin()
         playlistname = f"playlist-{int(time.time())}"
@@ -218,8 +236,6 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
     failed_ID = []
     latest_added_timestamp_ms = 0
     for video in tqdm(Videos, disable=logging.getLogger(__name__).isEnabledFor(logging.DEBUG)):
-        video_UUID = uuid.uuid4()
-        current_time_ms = int(time.time()*1000)
         videoinfo = YT_authordata(video.id)
         if videoinfo:
             video_title = videoinfo['title']
@@ -249,23 +265,16 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
             failed_ID.append(video.id)
             logger.error(f"{e} err, with https://www.youtube.com/watch?v={video.id}")
             continue
-        video_dict = dict(
-            videoId=video.id,
-            title=video_title,
-            author=channel_name,
-            authorId=channel_id,
-            published="",
-            lengthSeconds=video_duration,
-            timeAdded=current_time_ms,
-            type="video",
-            playlistItemId=str(video_UUID)
-        )
+        
+        video.title = video_title
+        video.author_name = channel_name
+        video.author_id = channel_id
+        video.length_s = video_duration
 
         if video.date_added_ms:
-            video_dict["timeAdded"] = video.date_added_ms
             latest_added_timestamp_ms = max(latest_added_timestamp_ms, video.date_added_ms)
 
-        playlist_dict["videos"].append(video_dict)
+        playlist_dict["videos"].append(video.to_dict())
         write_counter += 1
         logger.info(f"https://www.youtube.com/watch?v={video.id} written successfully")
     
