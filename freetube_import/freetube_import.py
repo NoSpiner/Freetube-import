@@ -12,12 +12,14 @@ import logging
 import html
 import urllib.parse
 from datetime import datetime
-from typing import Union
+from typing import Optional, Union, TypeAlias
 try:
     from youtube_search import YoutubeSearch
 except ImportError:
     from .youtube_search import YoutubeSearch
 
+
+VideoDict: TypeAlias = dict[str, Union[str, int]]
 
 class VideoInfo:
 
@@ -28,7 +30,7 @@ class VideoInfo:
             author_name: str = "",
             author_id: str = "",
             length_s: int = 0,
-            date_added_ms: int = int(time.time() * 1000)
+            date_added_ms: Optional[int] = None
         ):
 
         self.id = video_id
@@ -36,9 +38,9 @@ class VideoInfo:
         self.author_name = author_name
         self.author_id = author_id
         self.length_s = length_s
-        self.date_added_ms = date_added_ms
+        self.date_added_ms = date_added_ms or int(time.time() * 1000)
 
-    def to_dict(self) -> dict[str, Union[str, int, None]]:
+    def to_dict(self) -> VideoDict:
         return {
             "videoId": self.id,
             "title": self.title,
@@ -49,6 +51,40 @@ class VideoInfo:
             "timeAdded": self.date_added_ms,
             "type": "video",
             "playlistItemId": str(uuid.uuid4())
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict())
+
+
+PlaylistDict: TypeAlias = dict[str, Union[str, int, list[VideoDict]]]
+
+class PlaylistInfo:
+
+    def __init__(
+            self,
+            name: str,
+            videos: Optional[list[VideoInfo]] = None,
+            date_created_ms: Optional[int] = None,
+            date_last_updated_ms: Optional[int] = None
+        ):
+
+        self.name = name
+        self.videos = videos or []
+
+        current_time_ms = int(time.time() * 1000)
+
+        self.date_created_ms = date_created_ms or current_time_ms
+        self.date_last_updated_ms = date_last_updated_ms or current_time_ms
+
+
+    def to_dict(self) -> PlaylistDict:
+        return {
+            "playlistName": self.name,
+            "videos": [v.to_dict() for v in self.videos],
+            "_id": "ft-playlist--" + str(uuid.uuid4()),
+            "createdAt": self.date_created_ms,
+            "lastUpdatedAt": self.date_last_updated_ms
         }
 
     def to_json(self) -> str:
@@ -222,15 +258,7 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
     if pl_name:
         playlistname = pl_name
     print(f"writing to file {playlistname}.db", file=sys.stderr)
-    playlist_UUID = uuid.uuid4()
-    current_time_ms = int(time.time() * 1000)
-    playlist_dict = dict(
-        playlistName=playlistname,
-        videos=[],
-        _id="ft-playlist--" + str(playlist_UUID),
-        createdAt=current_time_ms,
-        lastUpdatedAt=current_time_ms
-    )
+    playlist = PlaylistInfo(name=playlistname)
     write_counter = 0
     failed_yt_search = []
     failed_ID = []
@@ -274,20 +302,20 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
         if video.date_added_ms:
             latest_added_timestamp_ms = max(latest_added_timestamp_ms, video.date_added_ms)
 
-        playlist_dict["videos"].append(video.to_dict())
+        playlist.videos.append(video)
         write_counter += 1
         logger.info(f"https://www.youtube.com/watch?v={video.id} written successfully")
     
-    playlist_dict["lastUpdatedAt"] = latest_added_timestamp_ms
+    playlist.date_last_updated_ms = latest_added_timestamp_ms
 
-    if len(playlist_dict["videos"]) != 0 and not stdin:
+    if len(playlist.videos) != 0 and not stdin:
         outputfile = open(playlistname+".db", "w")
-        outputfile.write(json.dumps(playlist_dict, separators = (',', ':'))+"\n")
+        outputfile.write(json.dumps(playlist.to_dict(), separators = (',', ':'))+"\n")
         outputfile.close()
         logger.info(f"{playlistname}.db written({write_counter}/{len(Videos)})")
         print(f"Task failed successfully! {playlistname}.db written, with {write_counter} entries", file=sys.stderr)
     elif stdin:
-        print(json.dumps(playlist_dict, separators = (',', ':')))
+        print(json.dumps(playlist.to_dict(), separators = (',', ':')))
         logger.info(f"written({write_counter}/{len(Videos)}) into standard output")
     else:
         print("No entries to write", file=sys.stderr)
