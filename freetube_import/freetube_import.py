@@ -253,10 +253,19 @@ def parse_videos(playlist_filepath, stdin) -> tuple[list[VideoInfo], str]:
 
 
 # Does the actual parsing and writing
-def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=False):
+def process_playlist(
+        playlist_filepath: str,
+        log_errors: bool = False,
+        list_broken_videos: bool =False,
+        stdin: bool = False,
+        pl_name: str = "",
+        trim_videos_suffix: bool = False
+    ):
     Videos, playlistname = parse_videos(playlist_filepath, stdin)
     if pl_name:
         playlistname = pl_name
+    if trim_videos_suffix:
+        playlistname = playlistname.removesuffix(" videos")
     print(f"writing to file {playlistname}.db", file=sys.stderr)
     playlist = PlaylistInfo(name=playlistname)
     write_counter = 0
@@ -334,12 +343,17 @@ def main():
     logger.setLevel(logging.ERROR)
     logging.basicConfig(format='[%(levelname)s] - %(message)s')
     parser = argparse.ArgumentParser(description="Import youtube playlists")
-    parser.add_argument("filepath", type=str, help="path to a valid .txt or .csv playlist file or files", nargs="*")
+    parser.add_argument("filepath", type=str, help="Path to a valid .txt or .csv playlist file or files", nargs="*")
     parser.add_argument('-a', '--list-all',action='store_true', help="Takes all .txt and csv files as input from the current working directory.")
     parser.add_argument('-b', '--list-broken-videos',action='store_true', help="Lists videos that were added but have possibly broken metadata (for debugging).")
     parser.add_argument('-e', '--log-errors',action='store_true', help="Also lists the videos that failed the metadata fetch")
     parser.add_argument('-s', '--stdin',action='store_true', help="Takes stdin as input and outputs dirextly to stdout")
-    parser.add_argument('-n', '--name', required=False, help="sets a name for playlist, otherwise uses input filename")
+    parser.add_argument('-n', '--name', required=False, help="Sets a name for playlist, otherwise uses input filename")
+    parser.add_argument(
+        '-t', '--trim-videos-suffix',
+        action="store_true",
+        help="Trims/removes the ' videos' suffix from the playlist name. (ex: 'Music videos videos.csv' would output 'Music videos.db')"
+    )
 
     flags = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
 
@@ -348,6 +362,7 @@ def main():
     list_broken_videos = flags.list_broken_videos
     stdin = flags.stdin
     pl_name = flags.name
+    trim_videos_suffix = flags.trim_videos_suffix
 
     # list txt and csv files in current working directory
     if flags.list_all:
@@ -358,20 +373,20 @@ def main():
                     playlist_files.append(i)
 
     if len(playlist_files) == 1:
-        process_playlist(playlist_files[0], log_errors, list_broken_videos,stdin, pl_name)
+        process_playlist(playlist_files[0], log_errors, list_broken_videos,stdin, pl_name, trim_videos_suffix=trim_videos_suffix)
         exit(0)
     elif len(playlist_files) > 1:
         for i, playlist in enumerate(playlist_files, start=1):
             filename = str(Path(playlist).name)
             print(f"[{i}/{len(playlist_files)}] {filename}", file=sys.stderr)
             try:
-                process_playlist(playlist, log_errors, list_broken_videos, stdin)
+                process_playlist(playlist, log_errors, list_broken_videos, stdin, trim_videos_suffix=trim_videos_suffix)
             except Exception as e:
                 logger.critical(f"{filename} Failed: {e}")
             print(" ", file=sys.stderr)
         exit(0)
     elif stdin:
-        process_playlist("", stdin=stdin, pl_name=pl_name)
+        process_playlist("", stdin=stdin, pl_name=pl_name, trim_videos_suffix=trim_videos_suffix)
 
 
 logger = logging.getLogger(__name__)
