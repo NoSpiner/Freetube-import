@@ -11,10 +11,84 @@ import os
 import logging
 import html
 import urllib.parse
+from datetime import datetime
+from typing import Optional, Union, TypeAlias
 try:
     from youtube_search import YoutubeSearch
 except ImportError:
     from .youtube_search import YoutubeSearch
+
+
+VideoDict: TypeAlias = dict[str, Union[str, int]]
+
+class VideoInfo:
+
+    def __init__(
+            self,
+            video_id: str,
+            title: str = "",
+            author_name: str = "",
+            author_id: str = "",
+            length_s: int = 0,
+            date_added_ms: Optional[int] = None
+        ):
+
+        self.id = video_id
+        self.title = title
+        self.author_name = author_name
+        self.author_id = author_id
+        self.length_s = length_s
+        self.date_added_ms = date_added_ms or int(time.time() * 1000)
+
+    def to_dict(self) -> VideoDict:
+        return {
+            "videoId": self.id,
+            "title": self.title,
+            "author": self.author_name,
+            "authorId": self.author_id,
+            "published": "",
+            "lengthSeconds": self.length_s,
+            "timeAdded": self.date_added_ms,
+            "type": "video",
+            "playlistItemId": str(uuid.uuid4())
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict())
+
+
+PlaylistDict: TypeAlias = dict[str, Union[str, int, list[VideoDict]]]
+
+class PlaylistInfo:
+
+    def __init__(
+            self,
+            name: str,
+            videos: Optional[list[VideoInfo]] = None,
+            date_created_ms: Optional[int] = None,
+            date_last_updated_ms: Optional[int] = None
+        ):
+
+        self.name = name
+        self.videos = videos or []
+
+        current_time_ms = int(time.time() * 1000)
+
+        self.date_created_ms = date_created_ms or current_time_ms
+        self.date_last_updated_ms = date_last_updated_ms or current_time_ms
+
+
+    def to_dict(self) -> PlaylistDict:
+        return {
+            "playlistName": self.name,
+            "videos": [v.to_dict() for v in self.videos],
+            "_id": "ft-playlist--" + str(uuid.uuid4()),
+            "createdAt": self.date_created_ms,
+            "lastUpdatedAt": self.date_last_updated_ms
+        }
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict())
 
 
 def YT_authordata(yt_id):
@@ -85,55 +159,77 @@ def get_duration(time):
         return "0:00"
 
 
-def process_txt(path):
+def yt_date_to_timestamp_ms(date: str) -> int:
+    dt = datetime.fromisoformat(date)
+    return int(dt.timestamp() * 1000)
+
+
+def process_txt(path) -> list[VideoInfo]:
     with open(path, "r") as inputfile:
-        Videos = inputfile.readlines()
-        Video_IDs = []
-        for i in Videos:
-            id = re.split(r"\?v=|youtu\.be/|shorts/", i)
+        lines = inputfile.readlines()
+        Videos: list[VideoInfo] = []
+        for l in lines:
+            if l.strip() == "":
+                continue
+
+            video_id = re.split(r"\?v=|youtu\.be/|shorts/", l)
             try:
-                id = id[1].rstrip()
-                Video_IDs.append(id)
+                video_id = video_id[1].rstrip()
+                Videos.append(VideoInfo(video_id=video_id))
             except IndexError:
                 pass
     logger.debug(f"{path} .txt file processed")
-    return Video_IDs
+    return Videos
 
 
-def process_csv(path):
+def process_csv(path) -> list[VideoInfo]:
     with open(path, "r") as inputfile:
-        Videos = inputfile.readlines()
-        Video_IDs = []
+        lines = inputfile.readlines()
+        Videos: list[VideoInfo] = []
         data_start = False
-        for i in Videos:
+        for l in lines:
+            if l.strip() == "":
+                continue
+
             if not data_start:
                 data_start = True
                 continue
             if data_start:
-                if not len(i.split(",")[0].strip()) == 11:
+                parts = l.split(",")
+                video_id = parts[0].strip()
+                date_added_str = parts[1].strip()
+                if not len(video_id) == 11:
                     continue
-                Video_IDs.append(i.split(",")[0].strip())
+                Videos.append(
+                    VideoInfo(
+                        video_id=video_id,
+                        date_added_ms=yt_date_to_timestamp_ms(date_added_str)
+                    )
+                )
     logger.debug(f"{path} .csv file processed")
-    return Video_IDs
+    return Videos
 
 
-def process_stdin():
-    Videos = sys.stdin.readlines()
-    Video_IDs = []
-    for i in Videos:
-        id = re.split(r"\?v=|youtu\.be/|shorts/", i)
+def process_stdin() -> list[VideoInfo]:
+    lines = sys.stdin.readlines()
+    Videos: list[VideoInfo] = []
+    for l in lines:
+        if l.strip() == "":
+            continue
+
+        video_id = re.split(r"\?v=|youtu\.be/|shorts/", l)
         try:
-            id = id[1].rstrip()
-            Video_IDs.append(id)
+            video_id = video_id[1].rstrip()
+            Videos.append(VideoInfo(video_id=video_id))
         except IndexError:
             pass
-    logger.debug(f"Std input read with {len(Video_IDs)} items")
-    return Video_IDs
+    logger.debug(f"Std input read with {len(Videos)} items")
+    return Videos
 
 
-def parse_videos(playlist_filepath, stdin):
+def parse_videos(playlist_filepath, stdin) -> tuple[list[VideoInfo], str]:
     if stdin and not playlist_filepath:
-        Video_IDs = process_stdin()
+        Videos = process_stdin()
         playlistname = f"playlist-{int(time.time())}"
 
     else:
@@ -144,41 +240,31 @@ def parse_videos(playlist_filepath, stdin):
         # a playlist name could have a dot in it so use splitext instead of splitting on a '.'
         playlistformat = os.path.splitext(playlistname)[1][1:].strip().lower()
         playlistname = os.path.splitext(playlistname)[0]
-        Video_IDs = []
+        Videos = []
         if playlistformat == "txt":
-            Video_IDs = process_txt(playlist_filepath)
+            Videos = process_txt(playlist_filepath)
         elif playlistformat == "csv":
-            Video_IDs = process_csv(playlist_filepath)
+            Videos = process_csv(playlist_filepath)
         else:
             logger.critical(f"{playlistformat} is invalid file format.")
             exit(1)
-    print(f"Reading file {playlist_filepath}, the playlistfile has {len(Video_IDs)} entries", file=sys.stderr)
-    return Video_IDs, playlistname
+    print(f"Reading file {playlist_filepath}, the playlistfile has {len(Videos)} entries", file=sys.stderr)
+    return Videos, playlistname
 
 
 # Does the actual parsing and writing
 def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=False):
-    Video_IDs, playlistname = parse_videos(playlist_filepath, stdin)
+    Videos, playlistname = parse_videos(playlist_filepath, stdin)
     if pl_name:
         playlistname = pl_name
     print(f"writing to file {playlistname}.db", file=sys.stderr)
-    playlist_UUID = uuid.uuid4()
-    current_time_ms = int(time.time() * 1000)
-    playlist_dict = dict(
-        playlistName=playlistname,
-        videos=[],
-        _id="ft-playlist--" + str(playlist_UUID),
-        createdAt=current_time_ms,
-        lastUpdatedAt=current_time_ms
-    )
+    playlist = PlaylistInfo(name=playlistname)
     write_counter = 0
     failed_yt_search = []
     failed_ID = []
-    for i in tqdm(Video_IDs, disable=logging.getLogger(__name__).isEnabledFor(logging.DEBUG)):
-        # for i in Video_IDs:
-        video_UUID = uuid.uuid4()
-        current_time_ms = int(time.time()*1000)
-        videoinfo = YT_authordata(i)
+    latest_added_timestamp_ms = 0
+    for video in tqdm(Videos, disable=logging.getLogger(__name__).isEnabledFor(logging.DEBUG)):
+        videoinfo = YT_authordata(video.id)
         if videoinfo:
             video_title = videoinfo['title']
             channel_name = videoinfo['channel']
@@ -191,55 +277,56 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
                 videoinfo_ID = videoinfo['id']
             except TypeError:
                 pass
-            if videoinfo_ID != i:
-                logger.info(f"Youtube-search: {videoinfo_ID} and input Id: {i} missmatch")
+            if videoinfo_ID != video.id:
+                logger.info(f"Youtube-search: {videoinfo_ID} and input Id: {video.id} missmatch")
                 # fetches the metadata directly from the video site when YoutubeSearch fails
-                if not (fallback_data := yt_video_data_fallback(i)):
-                    failed_ID.append(i)
+                if not (fallback_data := yt_video_data_fallback(video.id)):
+                    failed_ID.append(video.id)
                     continue
                 if fallback_data["title"]:
                     video_title = fallback_data["title"]
                     channel_name = fallback_data["author"]
                     channel_id = fallback_data["channelId"]
                     video_duration = fallback_data["lengthSeconds"]
-                failed_yt_search.append(i)
+                failed_yt_search.append(video.id)
         except Exception as e:
-            failed_ID.append(i)
-            logger.error(f"{e} err, with https://www.youtube.com/watch?v={i}")
+            failed_ID.append(video.id)
+            logger.error(f"{e} err, with https://www.youtube.com/watch?v={video.id}")
             continue
-        video_dict = dict(
-            videoId=i,
-            title=video_title,
-            author=channel_name,
-            authorId=channel_id,
-            published="",
-            lengthSeconds=video_duration,
-            timeAdded=current_time_ms,
-            type="video",
-            playlistItemId=str(video_UUID)
-        )
-        playlist_dict["videos"].append(video_dict)
+        
+        video.title = video_title
+        video.author_name = channel_name
+        video.author_id = channel_id
+        video.length_s = video_duration
+
+        if video.date_added_ms:
+            latest_added_timestamp_ms = max(latest_added_timestamp_ms, video.date_added_ms)
+
+        playlist.videos.append(video)
         write_counter += 1
-        logger.info(f"https://www.youtube.com/watch?v={i} written successfully")
-    if len(playlist_dict["videos"]) != 0 and not stdin:
+        logger.info(f"https://www.youtube.com/watch?v={video.id} written successfully")
+    
+    playlist.date_last_updated_ms = latest_added_timestamp_ms
+
+    if len(playlist.videos) != 0 and not stdin:
         outputfile = open(playlistname+".db", "w")
-        outputfile.write(json.dumps(playlist_dict, separators = (',', ':'))+"\n")
+        outputfile.write(json.dumps(playlist.to_dict(), separators = (',', ':'))+"\n")
         outputfile.close()
-        logger.info(f"{playlistname}.db written({write_counter}/{len(Video_IDs)})")
+        logger.info(f"{playlistname}.db written({write_counter}/{len(Videos)})")
         print(f"Task failed successfully! {playlistname}.db written, with {write_counter} entries", file=sys.stderr)
     elif stdin:
-        print(json.dumps(playlist_dict, separators = (',', ':')))
-        logger.info(f"written({write_counter}/{len(Video_IDs)}) into standard output")
+        print(json.dumps(playlist.to_dict(), separators = (',', ':')))
+        logger.info(f"written({write_counter}/{len(Videos)}) into standard output")
     else:
         print("No entries to write", file=sys.stderr)
     if len(failed_ID) != 0 and log_errors:
         print("[Failed playlist items]", file=sys.stderr)
-        for i in failed_ID:
-            print('https://www.youtube.com/watch?v='+i, file=sys.stderr)
+        for video.id in failed_ID:
+            print('https://www.youtube.com/watch?v='+video.id, file=sys.stderr)
     if len(failed_yt_search) != 0 and list_broken_videos:
         print("[Videos with possibly broken metadata]")
-        for i in failed_yt_search:
-            print('https://www.youtube.com/watch?v='+i, file=sys.stderr)
+        for video.id in failed_yt_search:
+            print('https://www.youtube.com/watch?v='+video.id, file=sys.stderr)
 
 
 def main():
