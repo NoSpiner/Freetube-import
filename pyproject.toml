@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "freetube-import"
-version = "0.34.0"
+version = "0.35.0"
 authors = [{ name="NoSpiner"}]
 description = "Converts text and youtube .csv files into FreeTube playlists"
 keywords = ["freetube","youtube","tube","playlist","import","cli","console","video","videos"]
