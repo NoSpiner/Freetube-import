@@ -3,7 +3,7 @@
 
 
 # Freetube-import
-Creates [FreeTube](https://freetubeapp.io/) .db playlist files from a list of youtube urls (.txt) or from .csv files exported from 'Google takeout'.
+Creates [FreeTube](https://freetubeapp.io/) .db playlist files from a list of youtube urls separated by a newline (.txt) or from .csv files exported from 'Google takeout'.
 
 Run the scrip with a path to a valid .txt file of youtube urls, or youtube's .csv playlist file. Then import the resulting .db file into FreeTube.
 
