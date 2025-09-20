@@ -3,7 +3,7 @@
 
 
 # Freetube-import
-Creates [FreeTube](https://freetubeapp.io/) .db playlist files from a list of youtube urls separated by a newline (.txt) or from .csv files exported from 'Google takeout'.
+Creates [FreeTube](https://freetubeapp.io/) .db playlist files from a list of youtube video urls separated by a newline (.txt) or from .csv files exported from 'Google takeout'.
 
 Run the scrip with a path to a valid .txt file of youtube urls, or youtube's .csv playlist file. Then import the resulting .db file into FreeTube.
 
@@ -50,7 +50,7 @@ pro tip: Try appending the ouput to FreeTube's own playlist.db file. So playlist
       cat test.txt | freetube-import -s -n playlist-name >> your/path/FreeTube/playlists.db
 
 
-Works without YouTube api through a custom version of [YouTube-search library](https://github.com/joetats/youtube_search/). Also works atleast on piped links, probably also on lists of Invidious links and other links that follow the standard youtube url format.
+Works without YouTube api through a custom version of [YouTube-search library](https://github.com/joetats/youtube_search/). Also works atleast on piped links, probably also on lists of Invidious links and other links that follow the standard youtube url format. VPN/proxy isn't strictly nessesary by my experience. I have run 1,5k videos videos through this in one sitting and gotten no ip blocks.
 
 ###  Dependencies 
 
