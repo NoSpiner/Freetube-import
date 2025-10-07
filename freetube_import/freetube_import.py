@@ -91,7 +91,7 @@ class PlaylistInfo:
         return json.dumps(self.to_dict())
 
 
-def YT_authordata(yt_id):
+def YT_authordata(yt_id) -> dict | None:
     try:
         if yt_id[0] == "_":
             return YoutubeSearch('https://www.youtube.com/watch?v=//'+yt_id, max_results = 1).to_dict()[0]
@@ -101,7 +101,7 @@ def YT_authordata(yt_id):
         return None
 
 
-def yt_video_data_fallback(url):
+def yt_video_data_fallback(url) -> dict | None:
     logger.debug(f"fallback fundtion called: https://www.youtube.com/watch?v={url}")
     url_quoted = urllib.parse.quote_plus(url)
     web_request = requests.get("https://www.youtube.com/watch?v="+url_quoted)
@@ -145,7 +145,7 @@ def yt_video_data_fallback(url):
                 )
 
 
-def get_duration(time):
+def get_duration(time) -> int:
     try:
         time_parts = re.split(r"[.:]", time)
         seconds = int(time_parts[-1])
@@ -156,7 +156,7 @@ def get_duration(time):
         return seconds+minutes*60+hours*3600
     except Exception as e:
         logger.error(f"get_duration() failed {e}")
-        return "0:00"
+        return 0
 
 
 def yt_date_to_timestamp_ms(date: str) -> int:
@@ -252,8 +252,31 @@ def parse_videos(playlist_filepath, stdin) -> tuple[list[VideoInfo], str]:
     return Videos, playlistname
 
 
+def write_output(playlist :PlaylistInfo, stdin = False, write_counter=0):
+    if len(playlist.videos) != 0 and not stdin:
+        outputfile = open(playlist.name+".db", "w")
+        outputfile.write(json.dumps(playlist.to_dict(), separators = (',', ':'))+"\n")
+        outputfile.close()
+        logger.info(f"{playlist.name}.db written({write_counter}/{len(playlist.videos)})")
+        print(f"Task failed successfully! {playlist.name}.db written, with {write_counter} entries", file=sys.stderr)
+    elif stdin:
+        print(json.dumps(playlist.to_dict(), separators = (',', ':')))
+        logger.info(f"written({write_counter}/{len(playlist.videos)}) into standard output")
+    else:
+        print("No entries to write", file=sys.stderr)
+
+def print_errors(failed_ID,failed_yt_search):
+    if len(failed_ID) != 0:
+        print("[Failed playlist items]", file=sys.stderr)
+        for video in failed_ID:
+            print('https://www.youtube.com/watch?v='+video.id, file=sys.stderr)
+    if len(failed_yt_search) != 0:
+        print("[Videos with possibly broken metadata]")
+        for video in failed_yt_search:
+            print('https://www.youtube.com/watch?v='+video, file=sys.stderr)
+
 # Does the actual parsing and writing
-def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=False):
+def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=""):
     Videos, playlistname = parse_videos(playlist_filepath, stdin)
     if pl_name:
         playlistname = pl_name
@@ -265,33 +288,30 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
     latest_added_timestamp_ms = 0
     for video in tqdm(Videos, disable=logging.getLogger(__name__).isEnabledFor(logging.DEBUG)):
         videoinfo = YT_authordata(video.id)
-        if videoinfo:
+        
+        # Fetch data with youtube_search 
+        if videoinfo and video.id == videoinfo['id']:
             video_title = videoinfo['title']
             channel_name = videoinfo['channel']
             channel_id = videoinfo['channelId']
             if not channel_id:
                 channel_id = "UC2hkwpSfrl6iniQNbwFXMog"
             video_duration = get_duration(videoinfo["duration"])
-        try:
-            try:
-                videoinfo_ID = videoinfo['id']
-            except TypeError:
-                pass
-            if videoinfo_ID != video.id:
-                logger.info(f"Youtube-search: {videoinfo_ID} and input Id: {video.id} missmatch")
-                # fetches the metadata directly from the video site when YoutubeSearch fails
-                if not (fallback_data := yt_video_data_fallback(video.id)):
-                    failed_ID.append(video.id)
-                    continue
-                if fallback_data["title"]:
-                    video_title = fallback_data["title"]
-                    channel_name = fallback_data["author"]
-                    channel_id = fallback_data["channelId"]
-                    video_duration = fallback_data["lengthSeconds"]
+        
+        # Uses fallback function to fetch video data directly from the video page
+        elif fallback_data := yt_video_data_fallback(video.id):
+            logger.info(f"using fallback for https://www.youtube.com/watch?v={video.id}")
+            video_title = fallback_data["title"]
+            channel_name = fallback_data["author"]
+            channel_id = fallback_data["channelId"]
+            video_duration = fallback_data["lengthSeconds"]
+            if list_broken_videos: 
                 failed_yt_search.append(video.id)
-        except Exception as e:
-            failed_ID.append(video.id)
-            logger.error(f"{e} err, with https://www.youtube.com/watch?v={video.id}")
+
+        else:
+            logger.error(f"error with https://www.youtube.com/watch?v={video.id}")
+            if log_errors: 
+                failed_ID.append(video.id)
             continue
         
         video.title = video_title
@@ -307,26 +327,9 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
         logger.info(f"https://www.youtube.com/watch?v={video.id} written successfully")
     
     playlist.date_last_updated_ms = latest_added_timestamp_ms
+    write_output(playlist,stdin,write_counter)
+    print_errors(failed_ID, failed_yt_search)
 
-    if len(playlist.videos) != 0 and not stdin:
-        outputfile = open(playlistname+".db", "w")
-        outputfile.write(json.dumps(playlist.to_dict(), separators = (',', ':'))+"\n")
-        outputfile.close()
-        logger.info(f"{playlistname}.db written({write_counter}/{len(Videos)})")
-        print(f"Task failed successfully! {playlistname}.db written, with {write_counter} entries", file=sys.stderr)
-    elif stdin:
-        print(json.dumps(playlist.to_dict(), separators = (',', ':')))
-        logger.info(f"written({write_counter}/{len(Videos)}) into standard output")
-    else:
-        print("No entries to write", file=sys.stderr)
-    if len(failed_ID) != 0 and log_errors:
-        print("[Failed playlist items]", file=sys.stderr)
-        for video.id in failed_ID:
-            print('https://www.youtube.com/watch?v='+video.id, file=sys.stderr)
-    if len(failed_yt_search) != 0 and list_broken_videos:
-        print("[Videos with possibly broken metadata]")
-        for video.id in failed_yt_search:
-            print('https://www.youtube.com/watch?v='+video.id, file=sys.stderr)
 
 
 def main():
