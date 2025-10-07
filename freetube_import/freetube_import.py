@@ -268,12 +268,13 @@ def write_output(playlist :PlaylistInfo, stdin = False, write_counter=0):
 def print_errors(failed_ID,failed_yt_search):
     if len(failed_ID) != 0:
         print("[Failed playlist items]", file=sys.stderr)
-        for video in failed_ID:
-            print('https://www.youtube.com/watch?v='+video.id, file=sys.stderr)
+        for video_id in failed_ID:
+            print('https://www.youtube.com/watch?v='+video_id, file=sys.stderr)
+            
     if len(failed_yt_search) != 0:
         print("[Videos with possibly broken metadata]")
-        for video in failed_yt_search:
-            print('https://www.youtube.com/watch?v='+video, file=sys.stderr)
+        for video_id in failed_yt_search:
+            print('https://www.youtube.com/watch?v='+video_id, file=sys.stderr)
 
 # Does the actual parsing and writing
 def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=""):
