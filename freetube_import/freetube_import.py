@@ -310,7 +310,7 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
                 failed_yt_search.append(video.id)
 
         else:
-            logger.error(f"error with https://www.youtube.com/watch?v={video.id}")
+            logger.warning(f"error with https://www.youtube.com/watch?v={video.id}")
             if log_errors: 
                 failed_ID.append(video.id)
             continue
