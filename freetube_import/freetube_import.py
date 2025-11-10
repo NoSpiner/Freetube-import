@@ -165,7 +165,7 @@ def yt_date_to_timestamp_ms(date: str) -> int:
 
 
 def process_txt(path) -> list[VideoInfo]:
-    with open(path, "r") as inputfile:
+    with open(path, "r", encoding='utf-8') as inputfile:
         lines = inputfile.readlines()
         Videos: list[VideoInfo] = []
         for l in lines:
@@ -183,7 +183,7 @@ def process_txt(path) -> list[VideoInfo]:
 
 
 def process_csv(path) -> list[VideoInfo]:
-    with open(path, "r") as inputfile:
+    with open(path, "r", encoding='utf-8') as inputfile:
         lines = inputfile.readlines()
         Videos: list[VideoInfo] = []
         data_start = False
@@ -254,7 +254,7 @@ def parse_videos(playlist_filepath, stdin) -> tuple[list[VideoInfo], str]:
 
 def write_output(playlist :PlaylistInfo, stdin = False, write_counter=0):
     if len(playlist.videos) != 0 and not stdin:
-        outputfile = open(playlist.name+".db", "w")
+        outputfile = open(playlist.name+".db", "w", encoding='utf-8')
         outputfile.write(json.dumps(playlist.to_dict(), separators = (',', ':'))+"\n")
         outputfile.close()
         logger.info(f"{playlist.name}.db written({write_counter}/{len(playlist.videos)})")
