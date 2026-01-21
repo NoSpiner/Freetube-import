@@ -29,13 +29,12 @@ Help message:
         filepath              path to a valid .txt or .csv playlist file or files
 
       optional arguments:
-        -h, --help            show this help message and exit
-        -a, --list-all        Takes all .txt and csv files as input from the current working directory.
-        -b, --list-broken-videos
-                        Lists videos that were added but have possibly broken metadata (for debugging).
-        -e, --log-errors      Also lists the videos that failed the metadata fetch
-        -s, --stdin           Takes stdin as input and outputs dirextly to stdout
-        -n NAME, --name NAME  sets a name for playlist, otherwise uses input filename
+         -h, --help        show this help message and exit
+         -a, --list-all    Takes all .txt and csv files as input from the current working directory.
+         -e, --log-errors  Also lists the videos that failed the metadata fetch
+         -s, --stdin       Takes stdin as input and outputs dirextly to stdout
+         -n, --name NAME   sets a name for playlist, otherwise uses input filename
+         -d, --debug       Debug mode with more info
 
 While buggy and experimental `stdin` mode can used in scripts and automation. Not for average users.
 
