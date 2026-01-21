@@ -102,7 +102,7 @@ def YT_authordata(yt_id) -> dict | None:
 
 
 def yt_video_data_fallback(url) -> dict | None:
-    logger.debug(f"fallback fundtion called: https://www.youtube.com/watch?v={url}")
+    logger.debug(f"fallback called: https://www.youtube.com/watch?v={url}")
     url_quoted = urllib.parse.quote_plus(url)
     web_request = requests.get("https://www.youtube.com/watch?v="+url_quoted)
     site_html = web_request.text
@@ -265,26 +265,22 @@ def write_output(playlist :PlaylistInfo, stdin = False, write_counter=0):
     else:
         print("No entries to write", file=sys.stderr)
 
-def print_errors(failed_ID,failed_yt_search):
+
+def print_errors(failed_ID):
     if len(failed_ID) != 0:
         print("[Failed playlist items]", file=sys.stderr)
         for video_id in failed_ID:
             print('https://www.youtube.com/watch?v='+video_id, file=sys.stderr)
             
-    if len(failed_yt_search) != 0:
-        print("[Videos with possibly broken metadata]")
-        for video_id in failed_yt_search:
-            print('https://www.youtube.com/watch?v='+video_id, file=sys.stderr)
 
 # Does the actual parsing and writing
-def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=False,stdin=False, pl_name=""):
+def process_playlist(playlist_filepath, log_errors=False,stdin=False, pl_name=""):
     Videos, playlistname = parse_videos(playlist_filepath, stdin)
     if pl_name:
         playlistname = pl_name
     print(f"writing to file {playlistname}.db", file=sys.stderr)
     playlist = PlaylistInfo(name=playlistname)
     write_counter = 0
-    failed_yt_search = []
     failed_ID = []
     latest_added_timestamp_ms = 0
     for video in tqdm(Videos, disable=logging.getLogger(__name__).isEnabledFor(logging.DEBUG)):
@@ -306,8 +302,6 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
             channel_name = fallback_data["author"]
             channel_id = fallback_data["channelId"]
             video_duration = fallback_data["lengthSeconds"]
-            if list_broken_videos: 
-                failed_yt_search.append(video.id)
 
         else:
             logger.warning(f"error with https://www.youtube.com/watch?v={video.id}")
@@ -329,29 +323,37 @@ def process_playlist(playlist_filepath, log_errors=False, list_broken_videos=Fal
     
     playlist.date_last_updated_ms = latest_added_timestamp_ms
     write_output(playlist,stdin,write_counter)
-    print_errors(failed_ID, failed_yt_search)
+    print_errors(failed_ID)
 
+
+def set_debug(flag:bool)->int:
+    if flag:
+        return logging.DEBUG
+    else:
+        return logging.ERROR
 
 
 def main():
-    # set logging to DEBUG for debug mode
-    logger.setLevel(logging.ERROR)
-    logging.basicConfig(format='[%(levelname)s] - %(message)s')
     parser = argparse.ArgumentParser(description="Import youtube playlists")
     parser.add_argument("filepath", type=str, help="path to a valid .txt or .csv playlist file or files", nargs="*")
     parser.add_argument('-a', '--list-all',action='store_true', help="Takes all .txt and csv files as input from the current working directory.")
-    parser.add_argument('-b', '--list-broken-videos',action='store_true', help="Lists videos that were added but have possibly broken metadata (for debugging).")
     parser.add_argument('-e', '--log-errors',action='store_true', help="Also lists the videos that failed the metadata fetch")
     parser.add_argument('-s', '--stdin',action='store_true', help="Takes stdin as input and outputs dirextly to stdout")
     parser.add_argument('-n', '--name', required=False, help="sets a name for playlist, otherwise uses input filename")
+    parser.add_argument('-d', '--debug', action='store_true', required=False, help="Debug mode with more info")
 
     flags = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
+    
 
     playlist_files = flags.filepath
     log_errors = flags.log_errors
-    list_broken_videos = flags.list_broken_videos
     stdin = flags.stdin
     pl_name = flags.name
+    debug = flags.debug
+    
+    # set logging to DEBUG for debug mode
+    logger.setLevel(set_debug(debug))
+    logging.basicConfig(format='[%(levelname)s] - %(message)s')
 
     # list txt and csv files in current working directory
     if flags.list_all:
@@ -362,14 +364,14 @@ def main():
                     playlist_files.append(i)
 
     if len(playlist_files) == 1:
-        process_playlist(playlist_files[0], log_errors, list_broken_videos,stdin, pl_name)
+        process_playlist(playlist_files[0], log_errors,stdin, pl_name)
         exit(0)
     elif len(playlist_files) > 1:
         for i, playlist in enumerate(playlist_files, start=1):
             filename = str(Path(playlist).name)
             print(f"[{i}/{len(playlist_files)}] {filename}", file=sys.stderr)
             try:
-                process_playlist(playlist, log_errors, list_broken_videos, stdin)
+                process_playlist(playlist, log_errors, stdin)
             except Exception as e:
                 logger.critical(f"{filename} Failed: {e}")
             print(" ", file=sys.stderr)
